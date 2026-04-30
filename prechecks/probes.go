@@ -110,34 +110,20 @@ func probeDNS(
 	resolver DNSResolver,
 	region string,
 ) ([][]*allregions.EdgeAddr, []CheckResult) {
+	region1Target, region2Target := regionTargets(region)
+
 	addrGroups, err := resolver.Resolve(region)
 	if err != nil || len(addrGroups) == 0 {
 		detail := detailsNoAddressesReturned
 		if err != nil {
 			detail = err.Error()
 		}
-		region1Target, region2Target := regionTargets(region)
 		return nil, []CheckResult{
-			{
-				Type:        ProbeTypeDNS,
-				Component:   componentDNSResolution,
-				Target:      region1Target,
-				ProbeStatus: Fail,
-				Details:     detail,
-				Action:      fmt.Sprintf(actionDNSFail, region1Target, region1Target),
-			},
-			{
-				Type:        ProbeTypeDNS,
-				Component:   componentDNSResolution,
-				Target:      region2Target,
-				ProbeStatus: Fail,
-				Details:     detail,
-				Action:      fmt.Sprintf(actionDNSFail, region2Target, region2Target),
-			},
+			newDNSCheckResult(region1Target, Fail, detail, fmt.Sprintf(actionDNSFail, region1Target, region1Target)),
+			newDNSCheckResult(region2Target, Fail, detail, fmt.Sprintf(actionDNSFail, region2Target, region2Target)),
 		}
 	}
 
-	region1Target, region2Target := regionTargets(region)
 	targets := []string{region1Target, region2Target}
 
 	results := make([]CheckResult, 0, len(addrGroups))
@@ -147,22 +133,9 @@ func probeDNS(
 			target = targets[i]
 		}
 		if len(group) == 0 {
-			results = append(results, CheckResult{
-				Type:        ProbeTypeDNS,
-				Component:   componentDNSResolution,
-				Target:      target,
-				ProbeStatus: Fail,
-				Details:     detailsNoAddressesReturned,
-				Action:      fmt.Sprintf(actionDNSFail, target, target),
-			})
+			results = append(results, newDNSCheckResult(target, Fail, detailsNoAddressesReturned, fmt.Sprintf(actionDNSFail, target, target)))
 		} else {
-			results = append(results, CheckResult{
-				Type:        ProbeTypeDNS,
-				Component:   componentDNSResolution,
-				Target:      target,
-				ProbeStatus: Pass,
-				Details:     detailsResolvedSuccessfully,
-			})
+			results = append(results, newDNSCheckResult(target, Pass, detailsResolvedSuccessfully, ""))
 		}
 	}
 
@@ -307,6 +280,19 @@ func skipResult(probeType ProbeType, component, target string) CheckResult {
 		Target:      target,
 		ProbeStatus: Skip,
 		Details:     detailsDNSPrerequisiteFailed,
+	}
+}
+
+// newDNSCheckResult creates a DNS CheckResult with the given fields.
+// Type and Component are always ProbeTypeDNS and componentDNSResolution.
+func newDNSCheckResult(target string, status Status, details, action string) CheckResult {
+	return CheckResult{
+		Type:        ProbeTypeDNS,
+		Component:   componentDNSResolution,
+		Target:      target,
+		ProbeStatus: status,
+		Details:     details,
+		Action:      action,
 	}
 }
 
